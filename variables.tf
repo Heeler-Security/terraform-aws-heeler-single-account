@@ -17,12 +17,12 @@ variable "heeler_eks_policy" {
 }
 
 variable "heeler_security_role_arn" {
-  description = "The role used by Heeler to assume roles within the customer accounts. This is available in the documentation or in the onboarding UI."
+  description = "The production role used by Heeler to assume roles within customer accounts. Override only when instructed by Heeler support."
   type        = string
+  default     = "arn:aws:iam::168777450829:role/prod-1-role"
 }
 
 variable "external_id" {
   description = "External Id to use when Heeler assumes the role in the account."
   type        = string
 }
-

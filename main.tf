@@ -1,5 +1,3 @@
-data "aws_region" "current" {}
-
 resource "aws_iam_policy" "heeler_read_only_policy" {
   description = "Heeler policy that denies access to certain actions and allows Lambda GetFunction and SSM SendCommand"
   name        = var.heeler_policy_name
@@ -82,10 +80,6 @@ resource "aws_iam_role" "heeler" {
   name                 = var.role_name
   description          = "Access for Heeler to fetch resources from account and allow API access to EKS clusters"
   max_session_duration = 28800
-  managed_policy_arns = [
-    "arn:aws:iam::aws:policy/ReadOnlyAccess",
-    aws_iam_policy.heeler_read_only_policy.arn
-  ]
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -112,10 +106,35 @@ resource "aws_iam_role" "heeler" {
       }
     ]
   })
+
+  # Older module versions managed two attachments through the deprecated
+  # managed_policy_arns argument. Ignore that legacy state while the dedicated
+  # attachment resources below take ownership, avoiding a detach/reattach
+  # window during upgrade.
+  lifecycle {
+    ignore_changes = [managed_policy_arns]
+  }
 }
 
-resource "aws_iam_policy_attachment" "heeler_eks_policy_attachment" {
-  name       = "HeelerEKS-TF"
+removed {
+  from = aws_iam_policy_attachment.heeler_eks_policy_attachment
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "read_only" {
+  role       = aws_iam_role.heeler.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "heeler_read_only" {
+  role       = aws_iam_role.heeler.name
+  policy_arn = aws_iam_policy.heeler_read_only_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "heeler_eks" {
+  role       = aws_iam_role.heeler.name
   policy_arn = aws_iam_policy.heeler_eks_policy.arn
-  roles      = [aws_iam_role.heeler.name]
 }

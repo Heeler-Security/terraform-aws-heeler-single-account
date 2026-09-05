@@ -1,0 +1,50 @@
+name: Terraform contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Terraform ${{ matrix.terraform }} / AWS ${{ matrix.aws }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - terraform: 1.11.0
+            aws: 5.0.0
+          - terraform: 1.16.1
+            aws: 6.63.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Select AWS provider
+        run: sed -i 's/>= 5.0.0, < 7.0.0/=${{ matrix.aws }}/' versions.tf
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ matrix.terraform }}
+          terraform_wrapper: false
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize
+        run: terraform init -backend=false -input=false
+
+      - name: Test apply and clean second plan
+        run: ./tests/assert-clean-second-plan.sh
+
+      - name: Initialize legacy upgrade fixture
+        run: terraform init -backend=false -input=false -test-directory=upgrade-tests
+
+      - name: Test safe legacy attachment upgrade
+        run: ./upgrade-tests/assert-safe-legacy-upgrade.sh
